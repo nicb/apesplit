@@ -1,0 +1,166 @@
+#!/usr/bin/env ruby
+#
+#
+
+require 'optparse'
+
+class String
+
+   def tag
+     return self.sub(/^\s+/,'').sub(/\s.*$/, '').downcase.intern
+   end
+
+   def strip_quotes
+	   return self.sub(/^[^"]*"/, '').sub(/".*$/, '')
+   end
+
+   def field(num = 0, fs = /\s+/)
+     return self.split(fs)[num]
+   end
+
+   def clean!
+     return self.chomp!.strip!
+   end
+
+end
+
+class ApeIndex
+  attr_reader :number, :time
+
+  def initialize(line)
+    @number = line.field(1)
+    @time = line.field(2)
+  end
+
+end
+
+class ApePiece
+  attr_accessor :track, :title, :performer, :flags, :indexes
+
+  def initialize
+    @indexes = []
+  end
+
+  class <<self
+
+  public
+
+    def parse(fh)
+      result = ApePiece.new
+      track_line = fh.gets
+      track_line.clean!
+      result.track = track_line.field(1)
+      pos = fh.pos
+      while (line = fh.gets) do
+        line.clean!
+        tag = line.tag
+        case tag
+        when :title, :performer : result.send(tag.to_s + '=', line.strip_quotes)
+        when :flags : result.flags = line.field(1)
+        when :index : result.indexes << ApeIndex.new(line)
+        end
+        if tag == :track
+          fh.seek(pos)
+          break
+        end
+        pos = fh.pos
+      end
+      return result
+    end
+
+  end
+
+end
+
+class OutFile
+  attr_reader :filename, :start_time, :end_time, :input_file
+
+  def initialize(ape_piece, end_time, author =nil, suffix = '.ogg', ifile = 'CDImage.ogg')
+    if_author = author ? "#{author} - " : '' 
+    @filename = "#{if_author}#{ape_piece.performer} - #{ape_piece.title}#{suffix}"
+    @start_time = ape_piece.indexes[0].time.sub(/:[0-9][0-9]$/,'')
+    @end_time = end_time ? end_time.sub(/:[0-9][0-9]$/,'') : end_time
+    @input_file = ifile
+  end
+
+  def write 
+    start_option = "-k #{start_time}"
+    end_option = end_time ? "-K #{end_time}" : ''
+    command_line = "ogg123 -d wav -f - #{start_option} #{end_option} #{input_file} | oggenc -b 320 - > \"#{filename}\""
+    puts(command_line)
+    system(command_line)
+  end
+
+end
+
+class ApePieceCollection
+  attr_accessor :pieces, :performer, :title, :file, :author, :rem, :catalog
+
+    def initialize(author)
+      @pieces = []
+      @author = author
+    end
+
+    def split
+      pieces.each_index do
+        |i|
+        p = pieces[i]
+        end_t = i+1 < pieces.size ? pieces[i+1].indexes[0].time : nil
+        out_file = OutFile.new(p, end_t, author)
+        out_file.write 
+      end
+    end
+
+    class <<self
+
+    public
+
+			def parse(cue_filename = 'CDImage.cue', author = nil)
+			  fh = File.open(cue_filename, 'r')
+        coll = ApePieceCollection.new(author)
+        pos = fh.pos
+			  while (line = fh.gets) do
+          line.clean!
+          tag = line.tag
+          if tag == :track
+            fh.seek(pos)
+            coll.pieces << ApePiece.parse(fh)
+          else
+			      coll.send(tag.to_s + '=', line.strip_quotes)
+			    end
+          pos = fh.pos
+			  end
+        fh.close
+        return coll
+			end
+
+    end
+
+end
+
+usage = "Usage: #{$0} [options] <cue filename>"
+options = {}
+begin
+	OptionParser.new do |opts|
+	  opts.banner = usage
+	
+	  opts.on('-a', '--author AUTHOR', 'Author Name') do
+	    |a|
+	    options[:author] = a
+	  end
+	end.parse!
+rescue OptionParser::InvalidOption
+  $stderr.puts("Invalid option\n" + usage)
+  exit(-1)
+end
+
+exitcode = 0
+if ARGV.size < 1
+  $stderr.puts(usage)
+  exitcode = -1
+else
+  apc = ApePieceCollection::parse(ARGV[0], options[:author])
+  apc.split
+end
+
+exit(exitcode)
