@@ -12,7 +12,7 @@ class String
    end
 
    def strip_quotes
-	   return self.sub(/^[^"]*"/, '').sub(/".*$/, '')
+     return self.sub(/^[^"]*"/, '').sub(/".*$/, '')
    end
 
    def field(num = 0, fs = /\s+/)
@@ -78,7 +78,7 @@ class OutFile
 
   def initialize(ape_piece, end_time, author =nil, suffix = '.ogg', ifile = 'CDImage.ogg')
     if_author = author ? "#{author} - " : '' 
-		track_number = "%02d" % ape_piece.track
+    track_number = "%02d" % ape_piece.track.to_i
     @filename = "#{track_number} - #{if_author}#{ape_piece.performer} - #{ape_piece.title}#{suffix}"
     @start_time = ape_piece.indexes[0].time.sub(/:[0-9][0-9]$/,'')
     @end_time = end_time ? end_time.sub(/:[0-9][0-9]$/,'') : end_time
@@ -117,24 +117,24 @@ class ApePieceCollection
 
     public
 
-			def parse(cue_filename = 'CDImage.cue', author = nil)
-			  fh = File.open(cue_filename, 'r')
+      def parse(cue_filename = 'CDImage.cue', author = nil)
+        fh = File.open(cue_filename, 'r')
         coll = ApePieceCollection.new(author)
         pos = fh.pos
-			  while (line = fh.gets) do
+        while (line = fh.gets) do
           line.clean!
           tag = line.tag
           if tag == :track
             fh.seek(pos)
             coll.pieces << ApePiece.parse(fh)
           else
-			      coll.send(tag.to_s + '=', line.strip_quotes)
-			    end
+            coll.send(tag.to_s + '=', line.strip_quotes)
+          end
           pos = fh.pos
-			  end
+        end
         fh.close
         return coll
-			end
+      end
 
     end
 
@@ -143,14 +143,14 @@ end
 usage = "Usage: #{$0} [options] <cue filename>"
 options = {}
 begin
-	OptionParser.new do |opts|
-	  opts.banner = usage
-	
-	  opts.on('-a', '--author AUTHOR', 'Author Name') do
-	    |a|
-	    options[:author] = a
-	  end
-	end.parse!
+  OptionParser.new do |opts|
+    opts.banner = usage
+  
+    opts.on('-a', '--author AUTHOR', 'Author Name') do
+      |a|
+      options[:author] = a
+    end
+  end.parse!
 rescue OptionParser::InvalidOption
   $stderr.puts("Invalid option\n" + usage)
   exit(-1)
