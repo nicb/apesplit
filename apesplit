@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 #
+# $Id$
 #
 
 require 'optparse'
@@ -77,7 +78,8 @@ class OutFile
 
   def initialize(ape_piece, end_time, author =nil, suffix = '.ogg', ifile = 'CDImage.ogg')
     if_author = author ? "#{author} - " : '' 
-    @filename = "#{if_author}#{ape_piece.performer} - #{ape_piece.title}#{suffix}"
+		track_number = "%02d" % ape_piece.track
+    @filename = "#{track_number} - #{if_author}#{ape_piece.performer} - #{ape_piece.title}#{suffix}"
     @start_time = ape_piece.indexes[0].time.sub(/:[0-9][0-9]$/,'')
     @end_time = end_time ? end_time.sub(/:[0-9][0-9]$/,'') : end_time
     @input_file = ifile
